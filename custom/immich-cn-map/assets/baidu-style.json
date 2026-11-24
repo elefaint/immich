@@ -1,0 +1,21 @@
+{
+  "version": 8,
+  "name": "Baidu / 百度地图",
+  "sources": {
+    "baidu": {
+      "type": "raster",
+      "tiles": [
+        "https://maponline0.bdimg.com/__wb_baidu__/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "attribution": "© 百度地图"
+    }
+  },
+  "layers": [
+    {
+      "id": "baidu",
+      "type": "raster",
+      "source": "baidu"
+    }
+  ]
+}
