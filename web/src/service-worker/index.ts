@@ -1,5 +1,6 @@
 import { installMessageListener } from './messaging';
 import { handleFetch as handleAssetFetch } from './request';
+import { handleTileRequest } from './tile-cache';
 
 const ASSET_REQUEST_REGEX = /^\/api\/assets\/[a-f0-9-]+\/(original|thumbnail)/;
 
@@ -17,6 +18,11 @@ const isImageTagRequest = (event: FetchEvent) =>
   event.request.method === 'GET' && event.request.destination === 'image';
 
 const handleFetch = (event: FetchEvent): void => {
+  // Third-party map tiles use a long-lived Cache API cache (cache-first).
+  if (handleTileRequest(event)) {
+    return;
+  }
+
   if (!isImageTagRequest(event)) {
     return;
   }
