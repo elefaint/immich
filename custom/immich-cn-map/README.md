@@ -20,7 +20,7 @@
 
 所以这里选择**在构建产物上打补丁**：按代码特征串定位 chunk（文件名带内容 hash，版本一变就换名），幂等替换，备份可回滚。
 
-代价是锚点与上游产物绑定。真要继续跟进上游，改动对应的源码位置在文末列出。
+代价是锚点与上游产物绑定。**要把这些改动移植回源码，见 [PORTING.md](PORTING.md)**，里面逐处给出了上游 `.svelte` / `.ts` 的 diff。
 
 ## 目录
 
@@ -29,6 +29,7 @@ custom/immich-cn-map/
 ├── apply.py            # 入口：status / apply / restore / bump-version / clean-precompressed
 ├── patchset.py         # 补丁定义（每条都带“为什么”）
 ├── set_map_style.py    # 把样式写进 Immich system-config（换底图用）
+├── PORTING.md          # 产物补丁 -> 上游源码的逐处 diff
 └── assets/
     ├── amap-style.json     # 高德栅格样式（当前使用）
     ├── baidu-style.json    # 百度样式（可选，需 --with-baidu）
