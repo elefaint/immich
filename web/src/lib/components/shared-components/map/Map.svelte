@@ -8,9 +8,9 @@
   void addProtocol('pmtiles', protocol.tile);
 
   // Amap base-layer switcher: street / satellite. The style defines both raster
-  // sources up front (amap-street, amap-satellite) plus a lighter annotation
-  // layer (amap-note); switching only toggles visibility, so no setStyle reload
-  // and no loss of the geojson marker layers.
+  // sources up front (amap-street with built-in labels, amap-satellite which
+  // already carries its own thin road network). Switching only toggles
+  // visibility, so no setStyle reload and no loss of the geojson marker layers.
   type AmapLayerMode = 'street' | 'satellite';
   const AMAP_LAYER_KEY = 'wb_map_layer';
 
@@ -26,18 +26,12 @@
     try {
       const hasStreet = !!map.getLayer('amap-street');
       const hasSatellite = !!map.getLayer('amap-satellite');
-      const hasNote = !!map.getLayer('amap-note');
       if (mode === 'street') {
         if (hasSatellite) map.setLayoutProperty('amap-satellite', 'visibility', 'none');
         if (hasStreet) map.setLayoutProperty('amap-street', 'visibility', 'visible');
-        if (hasNote) map.setLayoutProperty('amap-note', 'visibility', 'none');
       } else {
         if (hasStreet) map.setLayoutProperty('amap-street', 'visibility', 'none');
         if (hasSatellite) map.setLayoutProperty('amap-satellite', 'visibility', 'visible');
-        if (hasNote) {
-          map.setLayoutProperty('amap-note', 'visibility', 'visible');
-          map.setPaintProperty('amap-note', 'raster-opacity', 0.55);
-        }
       }
     } catch {
       /* style may not be the Amap style; ignore */
