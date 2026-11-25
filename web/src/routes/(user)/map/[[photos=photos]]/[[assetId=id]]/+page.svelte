@@ -10,6 +10,7 @@
   import { mapSettings } from '#lib/stores/preferences.store.ts';
   import { handlePromiseError } from '#lib/utils.ts';
   import { delay } from '#lib/utils/asset-utils.ts';
+  import { loadMapDefaultView } from '#lib/utils/map-default.ts';
   import { navigate } from '#lib/utils/navigation.ts';
   import { LoadingSpinner } from '@immich/ui';
   import { onDestroy } from 'svelte';
@@ -68,16 +69,18 @@
           isTimelinePanelVisible ? 'h-1/2 w-full pb-2 sm:h-full sm:w-2/3 sm:pe-2 sm:pb-0' : 'size-full',
         ]}
       >
-        {#await import('#lib/components/shared-components/map/Map.svelte')}
+        {#await Promise.all([import('#lib/components/shared-components/map/Map.svelte'), loadMapDefaultView()])}
           {#await delay(timeToLoadTheMap) then}
             <!-- show the loading spinner only if loading the map takes too much time -->
             <div class="flex size-full items-center justify-center">
               <LoadingSpinner />
             </div>
           {/await}
-        {:then { default: Map }}
+        {:then [{ default: Map }, mapDefault]}
           <Map
             hash
+            zoom={mapDefault?.zoom}
+            center={mapDefault?.center}
             onSelect={onViewAssets}
             {onClusterSelect}
             onViewportClose={closeTimelinePanel}

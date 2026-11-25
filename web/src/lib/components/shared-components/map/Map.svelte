@@ -18,6 +18,7 @@
   import { QueryKeys } from '#lib/queries/query-keys.ts';
   import { mapSettings } from '#lib/stores/preferences.store.ts';
   import { getAssetMediaUrl, handlePromiseError } from '#lib/utils.ts';
+  import { gcj2wgs, wgs2gcj } from '#lib/utils/geo-cn.ts';
   import type { MapMarkerResponseDto } from '@immich/sdk';
   import { Alert, Container, Icon, Text, Theme, modalManager, themeManager } from '@immich/ui';
   import { mdiCog, mdiImageMultiple, mdiMap, mdiMapMarker } from '@mdi/js';
@@ -99,6 +100,27 @@
     autoFitBounds = true,
   }: Props = $props();
 
+  // Dragging the map continuously fires viewport selections. Debounce those, but let a
+  // cluster click take effect immediately and cancel any pending viewport selection,
+  // otherwise both write to the timeline and the panel ends up with two sets of photos.
+  let selectTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastClusterSelectAt = 0;
+
+  const selectNow = (ids: string[], bbox: SelectionBBox) => {
+    clearTimeout(selectTimer);
+    selectTimer = undefined;
+    lastClusterSelectAt = Date.now();
+    onClusterSelect?.(ids, bbox);
+  };
+
+  const selectLazy = (ids: string[], bbox: SelectionBBox) => {
+    clearTimeout(selectTimer);
+    selectTimer = setTimeout(() => {
+      selectTimer = undefined;
+      onClusterSelect?.(ids, bbox);
+    }, 180);
+  };
+
   // Calculate initial bounds from markers once during initialization
   const initialBounds = (() => {
     if (!autoFitBounds || center || zoom !== undefined || !mapMarkers || mapMarkers.length === 0) {
@@ -107,7 +129,7 @@
 
     const bounds = new LngLatBounds();
     for (const marker of mapMarkers) {
-      bounds.extend([marker.lon, marker.lat]);
+      bounds.extend(wgs2gcj(marker.lon, marker.lat));
     }
     return bounds;
   })();
@@ -127,8 +149,9 @@
       marker.remove();
     }
 
-    center = { lng, lat };
-    marker = new Marker().setLngLat([lng, lat]).addTo(map);
+    const [mapLng, mapLat] = wgs2gcj(lng, lat);
+    center = { lng: mapLng, lat: mapLat };
+    marker = new Marker().setLngLat([mapLng, mapLat]).addTo(map);
   }
 
   function handleAssetClick(assetId: string, map: Map | null) {
@@ -144,7 +167,7 @@
     }
 
     const mapSource = map.getSource('geojson') as GeoJSONSource;
-    const leaves = await mapSource.getClusterLeaves(clusterId, 10_000, 0);
+    const leaves = await mapSource.getClusterLeaves(clusterId, 1_000_000, 0);
     const ids = leaves.map((leaf) => leaf.properties?.id as string);
 
     if (onClusterSelect && ids.length > 1) {
@@ -162,11 +185,16 @@
         north = Math.max(north, latitude);
       }
 
-      const bbox = { west, south, east, north };
-      onClusterSelect(ids, bbox);
+      // Feature coordinates are in GCJ-02; the timeline API queries WGS-84 assets.
+      const [westWgs, southWgs] = gcj2wgs(west, south);
+      const [eastWgs, northWgs] = gcj2wgs(east, north);
+      const bbox = { west: westWgs, south: southWgs, east: eastWgs, north: northWgs };
+      selectNow(ids, bbox);
       return;
     }
 
+    clearTimeout(selectTimer);
+    selectTimer = undefined;
     onSelect(ids);
   }
 
@@ -176,7 +204,8 @@
     }
 
     const { lng, lat } = event.lngLat;
-    onClickPoint({ lng, lat });
+    const [wgsLng, wgsLat] = gcj2wgs(lng, lat);
+    onClickPoint({ lng: wgsLng, lat: wgsLat });
 
     if (marker) {
       marker.remove();
@@ -192,7 +221,7 @@
   const asFeature = (marker: MapMarkerResponseDto): FeaturePoint => {
     return {
       type: 'Feature',
-      geometry: { type: 'Point', coordinates: [marker.lon, marker.lat] },
+      geometry: { type: 'Point', coordinates: wgs2gcj(marker.lon, marker.lat) },
       properties: {
         id: marker.id,
         city: marker.city,
@@ -205,9 +234,10 @@
   const asMarker = (feature: Feature<Geometry, GeoJsonProperties>): MapMarkerResponseDto => {
     const featurePoint = feature as FeaturePoint;
     const coords = LngLat.convert(featurePoint.geometry.coordinates as [number, number]);
+    const [lon, lat] = gcj2wgs(coords.lng, coords.lat);
     return {
-      lat: coords.lat,
-      lon: coords.lng,
+      lat,
+      lon,
       id: featurePoint.properties.id,
       city: featurePoint.properties.city,
       state: featurePoint.properties.state,
@@ -294,6 +324,7 @@
   });
 
   onDestroy(() => {
+    clearTimeout(selectTimer);
     void queryClient.cancelQueries({ queryKey: QueryKeys.mapMarkers() });
   });
 
@@ -344,18 +375,30 @@
     const showAll = east - west >= 360;
     const visibleIds = showAll
       ? mapMarkers.map(({ id }) => id)
-      : mapMarkers.filter(({ lon, lat }) => bounds.contains([lon, lat])).map(({ id }) => id);
+      : mapMarkers
+          .filter(({ lon, lat }) => {
+            const [mapLng, mapLat] = wgs2gcj(lon, lat);
+            return bounds.contains([mapLng, mapLat]);
+          })
+          .map(({ id }) => id);
 
+    const [westWgs, southWgs] = showAll ? [-180, -90] : gcj2wgs(west, bounds.getSouth());
+    const [eastWgs, northWgs] = showAll ? [180, 90] : gcj2wgs(east, bounds.getNorth());
     const bbox: SelectionBBox = {
-      west: showAll ? -180 : west,
-      south: showAll ? -90 : bounds.getSouth(),
-      east: showAll ? 180 : east,
-      north: showAll ? 90 : bounds.getNorth(),
+      west: westWgs,
+      south: southWgs,
+      east: eastWgs,
+      north: northWgs,
     };
-    onClusterSelect(visibleIds, bbox);
+    selectLazy(visibleIds, bbox);
   };
 
   const handleMoveEnd = () => {
+    // Opening the panel resizes the map and fires moveend; do not let that overwrite
+    // the cluster the user just selected.
+    if (Date.now() - lastClusterSelectAt < 1200) {
+      return;
+    }
     if (viewportGridActive && !assetViewerManager.isViewing) {
       handleViewportSelect();
     }
@@ -435,7 +478,7 @@
           features: mapMarkers?.map((marker) => asFeature(marker)) ?? [],
         }}
         id="geojson"
-        cluster={{ radius: 35, maxZoom: 18 }}
+        cluster={{ radius: 80, maxZoom: 20 }}
       >
         <MarkerLayer
           applyToClusters

@@ -53,6 +53,10 @@ export class TimelineMonth {
   readonly title: string;
   readonly yearMonth: TimelineYearMonth;
 
+  // Set by TimelineManager on each reload so keyed-each sees a new key even when
+  // the same year-month appears in two different selections.
+  generation: number | undefined;
+
   constructor(
     timelineManager: TimelineManager,
     yearMonth: TimelineYearMonth,
@@ -266,7 +270,7 @@ export class TimelineMonth {
 
   get viewId() {
     const { year, month } = this.yearMonth;
-    return year + '-' + month;
+    return (this.generation ?? 0) + '-' + year + '-' + month;
   }
 
   set height(height: number) {

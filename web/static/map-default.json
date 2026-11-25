@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "zoom": 11,
+  "center": {
+    "lng": 104.0658,
+    "lat": 30.6572
+  },
+  "zoomReplaceBelow": 5
+}

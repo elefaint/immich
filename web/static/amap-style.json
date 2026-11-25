@@ -1,0 +1,24 @@
+{
+  "version": 8,
+  "name": "Amap / 高德地图",
+  "sources": {
+    "amap": {
+      "type": "raster",
+      "tiles": [
+        "https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+        "https://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+        "https://webrd03.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+        "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}"
+      ],
+      "tileSize": 256,
+      "attribution": "© 高德地图"
+    }
+  },
+  "layers": [
+    {
+      "id": "amap",
+      "type": "raster",
+      "source": "amap"
+    }
+  ]
+}

@@ -74,6 +74,9 @@ const httpsDomain = (label: string) =>
 
 const emptyOrUrl = (error: string) => z.string().refine((url) => url.length === 0 || z.url().validate(url), { error });
 
+// Map styles are served as static assets, so allow same-origin absolute paths.
+const mapStyleUrlSchema = z.union([z.url(), z.string().startsWith('/')]);
+
 const AdminConfigIntegrityJobSchema = z
   .object({
     enabled: z.boolean().describe('Enabled'),
@@ -278,8 +281,8 @@ const AdminConfigSchemaWithVisibility = z
     map: z
       .object({
         enabled: configBool.describe('Enabled').meta({ visibility: Public }),
-        lightStyle: z.url().describe('Light map style URL').meta({ visibility: Public }),
-        darkStyle: z.url().describe('Dark map style URL').meta({ visibility: Public }),
+        lightStyle: mapStyleUrlSchema.describe('Light map style URL').meta({ visibility: Public }),
+        darkStyle: mapStyleUrlSchema.describe('Dark map style URL').meta({ visibility: Public }),
       })
       .meta({ id: 'AdminConfigMapDto' }),
     reverseGeocoding: z
@@ -720,8 +723,8 @@ export const defaults = Object.freeze<SystemConfig>({
   },
   map: {
     enabled: true,
-    lightStyle: 'https://tiles.immich.cloud/v1/style/light.json',
-    darkStyle: 'https://tiles.immich.cloud/v1/style/dark.json',
+    lightStyle: '/amap-style.json',
+    darkStyle: '/amap-style.json',
   },
   reverseGeocoding: {
     enabled: true,

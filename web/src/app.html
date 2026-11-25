@@ -25,6 +25,42 @@
       }
     </script>
 
+    <!-- Default map view: hardcoded fallback first, then load /map-default.json so
+         the view can be changed without rebuilding the frontend. -->
+    <script>
+      window.__wbMapDefault = {
+        enabled: true,
+        zoom: 11,
+        center: { lng: 104.0658, lat: 30.6572 },
+        zoomReplaceBelow: 5,
+      };
+      fetch('/map-default.json', { cache: 'no-store' })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((config) => {
+          if (config && typeof config === 'object') {
+            window.__wbMapDefault = config;
+          }
+        })
+        .catch(() => {});
+    </script>
+
+    <!-- MapLibre's hash plugin would otherwise restore a world-level view on /map. -->
+    <script>
+      try {
+        const path = location.pathname;
+        const search = location.search;
+        const match = /#([0-9]+(?:\.[0-9]+)?)\//.exec(location.hash || '');
+        if (match && /\/map\/?$/.test(path)) {
+          const threshold = window.__wbMapDefault?.zoomReplaceBelow ?? 5;
+          if (Number(match[1]) < threshold) {
+            history.replaceState(null, '', path + search);
+          }
+        }
+      } catch {
+        // noop
+      }
+    </script>
+
     %sveltekit.head%
 
     <style>

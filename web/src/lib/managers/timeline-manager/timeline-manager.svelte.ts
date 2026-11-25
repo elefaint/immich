@@ -28,7 +28,7 @@ import {
   type TimelineYearMonth,
 } from '#lib/utils/timeline-util.ts';
 import { AssetOrder, AssetOrderBy, AssetVisibility, getAssetInfo, type AssetResponseDto } from '@immich/sdk';
-import { clamp, isEqual } from 'lodash-es';
+import { clamp } from 'lodash-es';
 import { SvelteDate, SvelteSet } from 'svelte/reactivity';
 import { isMismatched, updateObject } from './internal/utils.svelte';
 import { TimelineDay } from './timeline-day.svelte';
@@ -50,6 +50,11 @@ type ViewportTopMonthIntersection = {
   // Where month bottom is in viewport (0 = viewport top, 1 = viewport bottom)
   monthBottomViewportRatio: number;
 };
+
+// Bumped on every month reload. Timeline.svelte keys its {#each} by viewId; without
+// a generation prefix, the same year-month from two different selections reuses old DOM.
+let monthGeneration = 0;
+
 export class TimelineManager extends VirtualScrollManager {
   override bottomSectionHeight = $state(60);
 
@@ -295,18 +300,27 @@ export class TimelineManager extends VirtualScrollManager {
   }
 
   async #initializeTimelineMonths() {
-    const timebuckets = await queryClient.query(getTimeBucketsQuery({ ...authManager.params, ...this.#options }));
+    // Snapshot the options: the request is not bound to initTask's AbortSignal, so a
+    // slow response from a previous cluster can arrive after the user selected another one.
+    const options = this.#options;
+    const timebuckets = await queryClient.query(getTimeBucketsQuery({ ...authManager.params, ...options }));
+    if (this.#options !== options) {
+      return;
+    }
 
+    const generation = ++monthGeneration;
     this.months = timebuckets.map((timeBucket) => {
       const date = new SvelteDate(timeBucket.timeBucket);
-      return new TimelineMonth(
+      const month = new TimelineMonth(
         this,
         { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 },
         timeBucket.count,
         false,
-        this.#options.order,
-        this.#options.orderBy,
+        options.order,
+        options.orderBy,
       );
+      month.generation = generation;
+      return month;
     });
     this.albumAssets.clear();
     this.updateViewportGeometry(false);
@@ -316,10 +330,6 @@ export class TimelineManager extends VirtualScrollManager {
     if (options.deferInit) {
       return;
     }
-    if (this.#options !== TimelineManager.#INIT_OPTIONS && isEqual(this.#options, options)) {
-      return;
-    }
-
     this.suspendTransitions = true;
     try {
       await this.initTask.reset();
@@ -327,7 +337,9 @@ export class TimelineManager extends VirtualScrollManager {
       this.updateViewportGeometry(false);
       this.#createScrubberMonths();
     } finally {
-      this.suspendTransitions = false;
+      // Keep transitions suspended for another second (setter has a 1s debounce) so
+      // the newly keyed months are laid out before the 150ms top animation resumes.
+      this.suspendTransitions = true;
     }
   }
 
@@ -608,7 +620,7 @@ export class TimelineManager extends VirtualScrollManager {
 
   override refreshLayout() {
     for (const month of this.months) {
-      updateGeometry(this, month, { invalidateHeight: true });
+      updateGeometry(this, month, { invalidateHeight: true, noDefer: true });
     }
     this.updateViewportProximities();
   }
