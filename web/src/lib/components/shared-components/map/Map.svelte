@@ -7,10 +7,11 @@
   setWorkerUrl(workerUrl);
   void addProtocol('pmtiles', protocol.tile);
 
-  // Amap base-layer switcher: street / satellite. The style defines both raster
-  // sources up front (amap-street with built-in labels, amap-satellite which
-  // already carries its own thin road network). Switching only toggles
-  // visibility, so no setStyle reload and no loss of the geojson marker layers.
+  // Amap base-layer switcher: street / satellite. The style defines the modern
+  // high-DPI street tiles (amap-street) with a separate POI/label overlay
+  // (amap-street-text), plus amap-satellite which carries its own road network.
+  // Switching only toggles visibility, so no setStyle reload and no loss of
+  // the geojson marker layers.
   type AmapLayerMode = 'street' | 'satellite';
   const AMAP_LAYER_KEY = 'wb_map_layer_v2';
 
@@ -25,12 +26,15 @@
   function applyAmapLayer(map: MapLibreMap, mode: AmapLayerMode) {
     try {
       const hasStreet = !!map.getLayer('amap-street');
+      const hasStreetText = !!map.getLayer('amap-street-text');
       const hasSatellite = !!map.getLayer('amap-satellite');
       if (mode === 'street') {
         if (hasSatellite) map.setLayoutProperty('amap-satellite', 'visibility', 'none');
         if (hasStreet) map.setLayoutProperty('amap-street', 'visibility', 'visible');
+        if (hasStreetText) map.setLayoutProperty('amap-street-text', 'visibility', 'visible');
       } else {
         if (hasStreet) map.setLayoutProperty('amap-street', 'visibility', 'none');
+        if (hasStreetText) map.setLayoutProperty('amap-street-text', 'visibility', 'none');
         if (hasSatellite) map.setLayoutProperty('amap-satellite', 'visibility', 'visible');
       }
     } catch {
