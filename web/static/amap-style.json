@@ -13,6 +13,18 @@
       "tileSize": 256,
       "maxzoom": 18,
       "attribution": "© 高德地图"
+    },
+    "amap-note": {
+      "type": "raster",
+      "tiles": [
+        "https://webst01.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}",
+        "https://webst02.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}",
+        "https://webst03.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}",
+        "https://webst04.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}"
+      ],
+      "tileSize": 256,
+      "maxzoom": 18,
+      "attribution": "© 高德地图"
     }
   },
   "layers": [
@@ -20,6 +32,11 @@
       "id": "amap",
       "type": "raster",
       "source": "amap"
+    },
+    {
+      "id": "amap-note",
+      "type": "raster",
+      "source": "amap-note"
     }
   ]
 }
