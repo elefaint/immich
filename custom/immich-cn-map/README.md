@@ -30,6 +30,7 @@ custom/immich-cn-map/
 ├── patchset.py         # 补丁定义（每条都带“为什么”）
 ├── set_map_style.py    # 把样式写进 Immich system-config（换底图用）
 ├── PORTING.md          # 产物补丁 -> 上游源码的逐处 diff
+├── CHANGELOG.md        # 变更说明（背景、改动清单、部署/验证/回滚）
 └── assets/
     ├── amap-style.json     # 高德栅格样式（当前使用）
     ├── baidu-style.json    # 百度样式（可选，需 --with-baidu）
