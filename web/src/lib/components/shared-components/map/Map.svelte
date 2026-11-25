@@ -12,13 +12,13 @@
   // already carries its own thin road network). Switching only toggles
   // visibility, so no setStyle reload and no loss of the geojson marker layers.
   type AmapLayerMode = 'street' | 'satellite';
-  const AMAP_LAYER_KEY = 'wb_map_layer';
+  const AMAP_LAYER_KEY = 'wb_map_layer_v2';
 
   function getAmapLayerMode(): AmapLayerMode {
     try {
-      return localStorage.getItem(AMAP_LAYER_KEY) === 'street' ? 'street' : 'satellite';
+      return localStorage.getItem(AMAP_LAYER_KEY) === 'satellite' ? 'satellite' : 'street';
     } catch {
-      return 'satellite';
+      return 'street';
     }
   }
 
