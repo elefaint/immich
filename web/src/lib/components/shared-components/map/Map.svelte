@@ -470,6 +470,19 @@
     selectLazy(visibleIds, bbox);
   };
 
+  // Keep pushing the guard timestamp while the asset viewer is open. Closing the
+  // viewer resizes the map and fires a moveend; without this the viewport reselect
+  // would overwrite the panel the user had open before opening a photo.
+  $effect(() => {
+    if (assetViewerManager.isViewing) {
+      lastClusterSelectAt = Date.now();
+      const timer = setInterval(() => {
+        lastClusterSelectAt = Date.now();
+      }, 60);
+      return () => clearInterval(timer);
+    }
+  });
+
   const handleMoveEnd = () => {
     // Opening the panel resizes the map and fires moveend; do not let that overwrite
     // the cluster the user just selected.
