@@ -1,11 +1,90 @@
 <script lang="ts" module>
-  import { addProtocol, setWorkerUrl } from 'maplibre-gl';
+  import { addProtocol, setWorkerUrl, type IControl, type Map as MapLibreMap } from 'maplibre-gl';
   import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
   import { Protocol } from 'pmtiles';
 
   let protocol = new Protocol();
   setWorkerUrl(workerUrl);
   void addProtocol('pmtiles', protocol.tile);
+
+  // Amap base-layer switcher: street / satellite. The style defines both raster
+  // sources up front (amap-street, amap-satellite) plus a lighter annotation
+  // layer (amap-note); switching only toggles visibility, so no setStyle reload
+  // and no loss of the geojson marker layers.
+  type AmapLayerMode = 'street' | 'satellite';
+  const AMAP_LAYER_KEY = 'wb_map_layer';
+
+  function getAmapLayerMode(): AmapLayerMode {
+    try {
+      return localStorage.getItem(AMAP_LAYER_KEY) === 'street' ? 'street' : 'satellite';
+    } catch {
+      return 'satellite';
+    }
+  }
+
+  function applyAmapLayer(map: MapLibreMap, mode: AmapLayerMode) {
+    try {
+      const hasStreet = !!map.getLayer('amap-street');
+      const hasSatellite = !!map.getLayer('amap-satellite');
+      const hasNote = !!map.getLayer('amap-note');
+      if (mode === 'street') {
+        if (hasSatellite) map.setLayoutProperty('amap-satellite', 'visibility', 'none');
+        if (hasStreet) map.setLayoutProperty('amap-street', 'visibility', 'visible');
+        if (hasNote) map.setLayoutProperty('amap-note', 'visibility', 'none');
+      } else {
+        if (hasStreet) map.setLayoutProperty('amap-street', 'visibility', 'none');
+        if (hasSatellite) map.setLayoutProperty('amap-satellite', 'visibility', 'visible');
+        if (hasNote) {
+          map.setLayoutProperty('amap-note', 'visibility', 'visible');
+          map.setPaintProperty('amap-note', 'raster-opacity', 0.55);
+        }
+      }
+    } catch {
+      /* style may not be the Amap style; ignore */
+    }
+  }
+
+  function createAmapLayerControl(): IControl {
+    let container: HTMLDivElement;
+    let button: HTMLButtonElement;
+    const paint = () => {
+      const mode = getAmapLayerMode();
+      button.textContent = mode === 'satellite' ? '\u{1F6F0}' : '\u{1F5FA}';
+      button.title = mode === 'satellite' ? '\u5f53\u524d\uff1a\u536b\u661f\u56fe\uff08\u70b9\u51fb\u5207\u8857\u9053\uff09' : '\u5f53\u524d\uff1a\u8857\u9053\u56fe\uff08\u70b9\u51fb\u5207\u536b\u661f\uff09';
+      button.setAttribute('aria-label', '\u5207\u6362\u8857\u9053 / \u536b\u661f\u56fe\u5c42');
+    };
+    return {
+      onAdd(map: MapLibreMap) {
+        container = document.createElement('div');
+        container.className = 'maplibregl-ctrl';
+        container.style.pointerEvents = 'auto';
+        button = document.createElement('button');
+        button.type = 'button';
+        button.style.cssText =
+          'pointer-events:auto;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.92);color:#333;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.18);font-size:15px;line-height:1';
+        paint();
+        button.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const next: AmapLayerMode = getAmapLayerMode() === 'satellite' ? 'street' : 'satellite';
+          try {
+            localStorage.setItem(AMAP_LAYER_KEY, next);
+          } catch {
+            /* ignore */
+          }
+          paint();
+          applyAmapLayer(map, next);
+        });
+        container.appendChild(button);
+        map.on('styledata', () => applyAmapLayer(map, getAmapLayerMode()));
+        applyAmapLayer(map, getAmapLayerMode());
+        return container;
+      },
+      onRemove() {
+        container?.remove();
+      },
+    };
+  }
 </script>
 
 <script lang="ts">
@@ -428,6 +507,9 @@
       event.on('moveend', handleMoveEnd);
       if (!simplified) {
         event.addControl(new GlobeControl(), 'top-left');
+      }
+      if (!simplified) {
+        event.addControl(createAmapLayerControl(), 'top-right');
       }
     }}
     bind:map
